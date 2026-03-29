@@ -1,30 +1,30 @@
 export const content = {
   hero: {
     title: "Hi, Anjanaa.",
-    subtext: "Just a small thing I put together.",
+    subtext: "Establishing A Meaningful Connect.",
   },
   message: {
-    paragraph: "Usually, I'd just send a text. But this felt slightly more interesting. Thanks for being one of the few people who actually make sense in this world…",
+    paragraph: "There’s a quiet power in how you just… show up. In a world of fleeting connections, our link is a constant. Thanks for being the anchor when things get heavy and the light when they're not.",
   },
   staggered: [
-    "The chaos.",
-    "The inside jokes.",
-    "The fact that we're still here."
+    "Your energy is rare.",
+    "A constant in the chaos.",
+    "Small moments, major impact.",
+    "The kind of friend everyone needs.",
+    "But somehow, I'm the lucky one.",
+    "Always got your back, unconditionally."
   ],
   pause: {
-    text: "Anyway…",
+    text: "Just Breathe.",
   },
   final: {
-    text: "Stay as cool as you are. Seriously.",
+    text: "Always. Got it?",
   },
   interaction: {
-    button: "Got it",
-    thankYou: "You're the best.",
+    button: "Confirm Our Link",
+    thankYou: "You're the absolute best.",
   },
-  colors: {
-    ivory: "#FFFFF0",
-    blush: "#FFF0F5",
-    lavender: "#E6E6FA",
-    beige: "#F5F5DC",
+  audio: {
+    url: "https://cdn.pixabay.com/audio/2026/03/12/audio_bea8e8877a.mp3", // Energetic Rock (Pixabay 500409)
   }
 };
