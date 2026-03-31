@@ -106,12 +106,15 @@ export default function Home() {
   const [needsUnmute, setNeedsUnmute] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const prankAudioRef = useRef<HTMLAudioElement | null>(null);
   const { scrollYProgress } = useScroll();
 
   useEffect(() => setIsMounted(true), []);
 
   useEffect(() => {
     if (!isMounted) return;
+    
+    // Main Romantic Music
     let audio: HTMLAudioElement;
     try {
       audio = new Audio("/audio/track.mp3");
@@ -121,6 +124,16 @@ export default function Home() {
     audio.loop = true;
     audio.volume = 0.35;
     audioRef.current = audio;
+
+    // Prank Comedy Music (New)
+    let prankAudio: HTMLAudioElement;
+    try {
+      prankAudio = new Audio("https://cdn.pixabay.com/audio/2024/09/26/audio_249ea3656c.mp3");
+    } catch {
+      return;
+    }
+    prankAudio.volume = 0.5;
+    prankAudioRef.current = prankAudio;
 
     const unmute = () => {
       if (!audioRef.current) return;
@@ -533,6 +546,27 @@ function ProposalSection() {
   };
 
   const handleYes = () => {
+    // Fade out romantic music
+    if (audioRef.current) {
+        const currentVol = audioRef.current.volume;
+        const fadeOut = setInterval(() => {
+            if (audioRef.current && audioRef.current.volume > 0.02) {
+                audioRef.current.volume -= 0.02;
+            } else {
+                if (audioRef.current) {
+                    audioRef.current.pause();
+                }
+                clearInterval(fadeOut);
+            }
+        }, 50);
+    }
+
+    // Play prank music
+    if (prankAudioRef.current) {
+        prankAudioRef.current.currentTime = 0;
+        prankAudioRef.current.play().catch(() => {});
+    }
+
     setStage("error");
     setTimeout(() => {
         setShowConfetti(true);
