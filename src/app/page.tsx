@@ -1,321 +1,788 @@
 "use client";
 
-import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
+import {
+  motion,
+  useScroll,
+  useTransform,
+  AnimatePresence,
+  useInView,
+} from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { content } from "@/config/content";
-import { cn } from "@/lib/utils";
 import { Volume2, VolumeX } from "lucide-react";
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function FadeIn({
+  children,
+  delay = 0,
+  className = "",
+  y = 24,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+  y?: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-60px" });
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 1.2, delay, ease: [0.16, 1, 0.3, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// ─── Star field ──────────────────────────────────────────────────────────────
+function StarField() {
+  const [stars] = useState(() =>
+    Array.from({ length: 50 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 2.5 + 0.5,
+      dur: Math.random() * 8 + 4,
+      delay: Math.random() * 6,
+    }))
+  );
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+      {stars.map((s) => (
+        <motion.div
+          key={s.id}
+          className="absolute rounded-full bg-gold/40"
+          style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.size, height: s.size }}
+          animate={{ opacity: [0, 1, 0], scale: [0.5, 1.5, 0.5] }}
+          transition={{ duration: s.dur, delay: s.delay, repeat: Infinity, ease: "easeInOut" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── Confetti ─────────────────────────────────────────────────────────────────
+function ConfettiBlast() {
+  const pieces = Array.from({ length: 40 }, (_, i) => ({
+    id: i,
+    color: ["#d4af37", "#f7e7ce", "#ff6b8a", "#a3e635", "#60d5ff", "#fbbf24"][
+      Math.floor(Math.random() * 6)
+    ],
+    x: (Math.random() - 0.5) * 120,
+    rotate: Math.random() * 720 - 360,
+    delay: Math.random() * 0.4,
+    size: Math.random() * 10 + 6,
+  }));
+  return (
+    <div className="fixed inset-0 pointer-events-none z-[500] flex items-center justify-center">
+      {pieces.map((p) => (
+        <motion.div
+          key={p.id}
+          className="absolute rounded-sm"
+          style={{ backgroundColor: p.color, width: p.size, height: p.size * 0.6 }}
+          initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
+          animate={{
+            x: `${p.x}vw`,
+            y: ["0vh", "-20vh", "90vh"],
+            opacity: [1, 1, 0],
+            rotate: p.rotate,
+          }}
+          transition={{ duration: 2.5, delay: p.delay, ease: "easeIn" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export default function Home() {
-  const containerRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [needsUnmute, setNeedsUnmute] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
   const { scrollYProgress } = useScroll();
 
+  useEffect(() => setIsMounted(true), []);
+
   useEffect(() => {
-    setIsMounted(true);
-    // Initialize audio with the track from the Content Config
-    const audio = new Audio(content.audio.url); 
+    if (!isMounted) return;
+    let audio: HTMLAudioElement;
+    try {
+      audio = new Audio("/audio/track.mp3");
+    } catch {
+      return;
+    }
     audio.loop = true;
-    audio.volume = 0.5;
+    audio.volume = 0.35;
     audioRef.current = audio;
 
-    const startAudio = () => {
-        if (audioRef.current && !isPlaying) {
-            audioRef.current.play()
-                .then(() => setIsPlaying(true))
-                .catch(err => console.log("Audio start blocked", err));
-            
-            // Clean up all possible triggers
-            ["click", "touchstart", "scroll", "keydown"].forEach(e => 
-                window.removeEventListener(e, startAudio)
-            );
-        }
+    const unmute = () => {
+      if (!audioRef.current) return;
+      audioRef.current.muted = false;
+      audioRef.current.volume = 0.35;
+      setIsMuted(false);
+      setNeedsUnmute(false);
     };
 
-    // Listen for any form of interaction
-    ["click", "touchstart", "scroll", "keydown"].forEach(e => 
-        window.addEventListener(e, startAudio)
-    );
+    audio
+      .play()
+      .then(() => {
+        setIsPlaying(true);
+        setNeedsUnmute(false);
+      })
+      .catch(() => {
+        audio.muted = true;
+        audio.volume = 0;
+        audio
+          .play()
+          .then(() => {
+            setIsPlaying(true);
+            setNeedsUnmute(true);
+            ["click", "touchstart", "scroll", "keydown", "pointerdown"].forEach((e) =>
+              window.addEventListener(e, unmute, { passive: true, once: true })
+            );
+          })
+          .catch(() => {
+            const start = () => {
+              audioRef.current?.play().then(() => {
+                setIsPlaying(true);
+                setIsMuted(false);
+              });
+            };
+            ["click", "touchstart", "scroll", "keydown", "pointerdown"].forEach((e) =>
+              window.addEventListener(e, start, { passive: true, once: true })
+            );
+          });
+      });
 
     return () => {
-      ["click", "touchstart", "scroll", "keydown"].forEach(e => 
-        window.removeEventListener(e, startAudio)
-      );
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
+      audioRef.current?.pause();
+      audioRef.current = null;
     };
-  }, [isPlaying]);
+  }, [isMounted]);
 
   const toggleMusic = () => {
-    // Hidden toggle logic if needed for programmatically unmuting
-    if (audioRef.current && !isPlaying) {
-      audioRef.current.play().catch(err => console.error(err));
-      setIsPlaying(true);
+    if (!audioRef.current) return;
+    if (isMuted || audioRef.current.muted) {
+      audioRef.current.muted = false;
+      audioRef.current.volume = 0.35;
+      setIsMuted(false);
+      setNeedsUnmute(false);
+    } else {
+      audioRef.current.muted = true;
+      setIsMuted(true);
     }
   };
 
-  const heroY = useTransform(scrollYProgress, [0, 0.5], [0, 150]);
-
-  if (!isMounted) return null;
-
   return (
-    <main ref={containerRef} className="relative mesh-gradient text-champagne selection:bg-gold selection:text-forest overflow-x-hidden">
-      {/* Scroll Progress Indicator */}
+    <main className="relative bg-[#0d120f] text-[#f7e7ce] overflow-x-hidden selection:bg-[#d4af37] selection:text-[#0d120f]">
+      {/* Scroll bar */}
       <motion.div
-        className="fixed top-0 left-0 right-0 h-1 bg-gold origin-left z-[60]"
+        className="fixed top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#d4af37] via-[#f7e7ce] to-[#d4af37] origin-left z-[100]"
         style={{ scaleX: scrollYProgress }}
       />
 
-      {/* Background Decorative Elements */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <motion.div 
-          animate={{ scale: [1, 1.2, 1], x: [0, 50, 0], y: [0, 30, 0] }}
-          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -top-[10%] -left-[10%] w-[70%] h-[70%] bg-forest/50 rounded-full blur-[120px]" 
+      <StarField />
+
+      {/* Ambient blobs */}
+      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+        <motion.div
+          animate={{ scale: [1, 1.3, 1], x: [0, 60, 0], y: [0, 40, 0] }}
+          transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -top-1/3 -left-1/3 w-full h-full rounded-full blur-[150px]"
+          style={{ backgroundColor: "rgba(26,36,30,0.8)" }}
         />
-        <motion.div 
-          animate={{ scale: [1, 1.1, 1], x: [0, -40, 0], y: [0, -20, 0] }}
-          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -bottom-[10%] -right-[5%] w-[60%] h-[60%] bg-gold/10 rounded-full blur-[100px]" 
+        <motion.div
+          animate={{ scale: [1, 1.2, 1], x: [0, -50, 0], y: [0, -30, 0] }}
+          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -bottom-1/3 -right-1/3 w-full h-full rounded-full blur-[150px]"
+          style={{ backgroundColor: "rgba(212,175,55,0.06)" }}
         />
       </div>
 
-      {/* No Mute Button - Transparent Interaction Layer Only */}
-      <div 
-        className="fixed inset-0 pointer-events-none z-[100]" 
-        onClick={toggleMusic}
-      />
-
-      {/* Hero Section - Continuous Flow with Layering */}
-      <section className="flex flex-col items-center justify-center relative px-6 py-12 md:py-24 text-center">
-        <motion.div
-           style={{ y: heroY }}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 2.5, ease: [0.16, 1, 0.3, 1] }}
-          className="relative z-20 w-full max-w-[280px] md:max-w-lg group"
-        >
-          <div className="absolute inset-0 bg-gold/10 blur-[80px] rounded-full scale-105 -z-10" />
-          <Image
-            src="/images/anjana.jpeg"
-            alt="Anjanaa's digital letter"
-            width={800}
-            height={1000}
-            priority
-            className="w-full h-auto object-contain rounded-[1rem] md:rounded-[2rem] shadow-[0_40px_120px_-30px_rgba(0,0,0,0.6)] transition-all duration-[2s] group-hover:scale-[1.01]"
-          />
-        </motion.div>
-
-        <div className="mt-12 md:mt-24 space-y-3 md:space-y-6 max-w-4xl px-4 relative z-10">
-          <motion.h1 
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 2, ease: [0.16, 1, 0.3, 1] }}
-            className="font-serif text-5xl md:text-[10rem] font-extralight tracking-tighter leading-[0.9] text-gold"
-          >
-             {content.hero.title}
-          </motion.h1>
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.5, duration: 2 }}
-            className="text-[10px] md:text-lg font-light tracking-[0.6em] text-champagne/40 italic uppercase"
-          >
-            {content.hero.subtext}
-          </motion.p>
-        </div>
-      </section>
-
-      {/* Deep Message - Continuous Gap */}
-      <section className="flex items-center justify-center px-6 py-10 relative">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-20px" }}
-          transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
-          className="max-w-4xl mx-auto text-center space-y-8"
-        >
-          <div className="w-10 h-[1px] bg-gold/30 mx-auto" />
-          <p className="font-light text-2xl md:text-7xl md:leading-[1.1] text-champagne/80 font-serif italic text-balance px-4">
-            &ldquo;{content.message.paragraph}&rdquo;
-          </p>
-        </motion.div>
-      </section>
-
-      {/* Staggered Text - Continuous flow with Gold Borders */}
-      <section className="flex flex-col items-center justify-center px-6 relative py-4">
-        <div className="max-w-6xl w-full mx-auto space-y-10 md:space-y-64">
-          {content.staggered.map((text, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: i % 2 === 0 ? -15 : 15 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true, margin: "-40px" }}
-              transition={{ delay: i * 0.1, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
-              className={cn(
-                "text-2xl md:text-[9rem] font-serif font-extralight tracking-tighter flex items-center leading-tight",
-                i % 2 === 1 ? "justify-end text-right pr-4 border-r-2 border-gold/20" : "justify-start pl-4 border-l-2 border-gold/20"
-              )}
+      {/* Music button */}
+      <div className="fixed bottom-6 right-6 z-[200] flex items-center gap-3">
+        <AnimatePresence>
+          {needsUnmute && (
+            <motion.span
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0 }}
+              className="text-[9px] uppercase tracking-[0.2em] text-[#f7e7ce]/40 whitespace-nowrap pointer-events-none"
             >
-              <span className="max-w-[200px] md:max-w-4xl text-champagne/70">{text}</span>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* Pause Section */}
-      <section className="h-[60vh] flex items-center justify-center relative bg-white/5 mx-8 md:mx-20 rounded-[3.5rem] border border-white/40">
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 4 }}
-          className="text-center"
+              tap to unmute
+            </motion.span>
+          )}
+        </AnimatePresence>
+        <motion.button
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 2 }}
+          onClick={toggleMusic}
+          className="w-11 h-11 rounded-full flex items-center justify-center bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 hover:border-[#d4af37]/30 transition-all duration-500 relative"
         >
-          <p className="text-xl md:text-3xl font-light tracking-[1em] uppercase opacity-20 select-none">
-            {content.pause.text}
-          </p>
-        </motion.div>
-      </section>
+          {isPlaying && !isMuted && (
+            <motion.span
+              className="absolute inset-0 rounded-full border border-[#d4af37]/30"
+              animate={{ scale: [1, 1.8], opacity: [0.5, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+          )}
+          {isMuted ? (
+            <VolumeX className="w-4 h-4 text-[#f7e7ce]/40" />
+          ) : (
+            <Volume2 className={`w-4 h-4 ${isPlaying ? "text-[#d4af37]/80" : "text-[#f7e7ce]/30"}`} />
+          )}
+        </motion.button>
+      </div>
 
-      {/* Final Interaction - Luxurious & Seamless */}
-      <section className="flex flex-col items-center justify-center px-6 text-center space-y-8 md:space-y-32 py-12">
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 3, ease: [0.16, 1, 0.3, 1] }}
-          className="max-w-2xl space-y-4"
-        >
-          <div className="w-8 h-[1px] bg-gold/40 mx-auto" />
-          <h2 className="font-serif text-3xl md:text-[10rem] font-extralight leading-tight tracking-tighter text-gold">
-            {content.final.text}
-          </h2>
-        </motion.div>
-
-        <InteractionButton />
-      </section>
-
-      {/* Footer */}
-      <footer className="py-32 text-center">
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          transition={{ duration: 4 }}
-          className="space-y-4"
-        >
-          <div className="w-12 h-[1px] bg-gold/20 mx-auto" />
-          <p className="text-[10px] font-medium tracking-[2em] text-champagne/20 uppercase pl-[2em]">
-            Digital Memory Collector
-          </p>
-        </motion.div>
-      </footer>
+      <HeroSection />
+      <ReasonsSection />
+      <TimelineSection />
+      <ConfessionSection />
+      <ProposalSection />
+      <Footer />
     </main>
   );
 }
 
-function InteractionButton() {
-  const [isClicked, setIsClicked] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-
-  const handleButtonClick = () => {
-    setIsClicked(true);
-    setShowModal(true);
-  };
-
+// ─── Hero ─────────────────────────────────────────────────────────────────────
+function HeroSection() {
   return (
-    <div className="flex flex-col items-center gap-16">
-      <motion.button
-        whileHover={{ scale: 1.05, y: -5, boxShadow: "0 25px 50px -12px rgba(45, 62, 53, 0.15)" }}
-        whileTap={{ scale: 0.98 }}
-        onClick={handleButtonClick}
-        className={cn(
-          "px-24 py-10 rounded-full font-bold tracking-[0.5em] transition-all duration-700 uppercase text-[10px] relative overflow-hidden",
-          isClicked 
-            ? "bg-gold text-forest shadow-2xl scale-110" 
-            : "bg-white/5 text-champagne border border-white/10 hover:bg-gold hover:text-forest"
-        )}
+    <section className="min-h-screen flex flex-col items-center justify-center relative px-6 py-20 text-center overflow-hidden">
+      {/* Giant watermark letter */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+        <span
+          className="font-serif font-extralight leading-none tracking-tighter"
+          style={{ fontSize: "45vw", color: "rgba(212,175,55,0.025)" }}
+        >
+          A
+        </span>
+      </div>
+
+      {/* Photo */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.85 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 2, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10"
       >
-        <span className="relative z-10">{content.interaction.button}</span>
-        {!isClicked && (
-          <motion.div 
-            animate={{ x: ["-100%", "200%"] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12" 
+        <div className="relative w-44 h-44 md:w-64 md:h-64 rounded-full overflow-hidden border border-[#d4af37]/20 shadow-[0_0_100px_-10px_rgba(212,175,55,0.25)]">
+          <Image
+            src="/images/anjana.jpeg"
+            alt="Anjana"
+            fill
+            sizes="(max-width:768px) 176px, 256px"
+            className="object-cover"
+            priority
           />
-        )}
-      </motion.button>
+        </div>
+        {/* Rings */}
+        {[1.2, 1.5, 1.8].map((scale, i) => (
+          <motion.div
+            key={i}
+            className="absolute inset-0 rounded-full border border-[#d4af37]/10"
+            animate={{ scale: [1, scale, 1], opacity: [0.3, 0, 0.3] }}
+            transition={{ duration: 4, delay: i * 1.2, repeat: Infinity }}
+          />
+        ))}
+      </motion.div>
 
-      {/* Premium Pop-up Modal */}
-      <AnimatePresence>
-        {showModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowModal(false)}
-              className="absolute inset-0 bg-forest/20 backdrop-blur-sm"
-            />
-            
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-[320px] md:max-w-lg glass p-6 py-10 md:p-16 rounded-[2rem] md:rounded-[4rem] text-center space-y-6 md:space-y-10 shadow-[0_40px_80px_-20px_rgba(26,36,30,0.5)] border-2 border-white/60 overflow-hidden"
-            >
-              {/* Vibrant Glow Backgrounds */}
-              <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-sage/50 to-transparent -z-10" />
-              
-              <div className="relative w-full max-w-[200px] md:max-w-[260px] aspect-[4/5] mx-auto rounded-2xl overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.6)] border-2 border-white/20 scale-105 -mt-20 mb-6 transition-transform duration-700 hover:scale-[1.1]">
-                 <Image
-                    src="/images/anjana.jpeg"
-                    alt="Anjanaa's picture"
-                    fill
-                    className="object-cover"
-                />
-              </div>
-
-              <div className="space-y-3 md:space-y-5">
-                <p className="text-[8px] md:text-[10px] uppercase tracking-[0.8em] text-champagne/40 font-bold pr-[-1em]">A digital note for you</p>
-                <h3 className="text-2xl md:text-6xl font-serif italic text-gold leading-tight drop-shadow-[0_2px_15px_rgba(212,175,55,0.3)]">
-                  {content.interaction.thankYou}
-                </h3>
-              </div>
-              
-              <div className="w-12 h-[1px] bg-gold/20 mx-auto" />
-              
-              <p className="text-champagne/70 font-light text-sm md:text-lg leading-relaxed max-w-[200px] md:max-w-xs mx-auto text-pretty">
-                I hope you keep being exactly as you are. Seriously.
-              </p>
-
-              <button 
-                onClick={() => setShowModal(false)}
-                className="text-[10px] uppercase tracking-[0.4em] font-bold text-champagne/40 hover:text-gold transition-all duration-300 pt-4 block mx-auto"
-              >
-                Close
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {isClicked && !showModal && (
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6, duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
+        className="mt-10 space-y-4 z-10"
+      >
+        <p className="text-[10px] tracking-[0.5em] uppercase text-[#d4af37]/40">
+          a special message for
+        </p>
+        <h1
+          className="font-serif font-extralight tracking-tighter text-[#d4af37] leading-none"
+          style={{ fontSize: "clamp(4rem, 15vw, 12rem)" }}
+        >
+          {content.hero.title}
+        </h1>
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="text-2xl font-serif italic text-gold/60 font-light"
+          transition={{ delay: 1.2, duration: 2 }}
+          className="text-[#f7e7ce]/50 text-sm md:text-lg font-light max-w-sm mx-auto leading-relaxed italic"
         >
-          {content.interaction.thankYou}
+          &ldquo;{content.hero.subtitle}&rdquo;
         </motion.p>
+      </motion.div>
+
+      {/* Scroll cue */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 3, duration: 2 }}
+        className="mt-16 flex flex-col items-center gap-2 z-10"
+      >
+        <p className="text-[9px] tracking-[0.4em] uppercase text-[#f7e7ce]/20">scroll</p>
+        <motion.div
+          animate={{ y: [0, 10, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="w-[1px] h-10 bg-gradient-to-b from-[#d4af37]/30 to-transparent"
+        />
+      </motion.div>
+    </section>
+  );
+}
+
+// ─── Reasons ──────────────────────────────────────────────────────────────────
+function ReasonsSection() {
+  return (
+    <section className="px-5 py-24 relative">
+      <div className="max-w-5xl mx-auto">
+        <FadeIn className="text-center mb-16 space-y-3">
+          <p className="text-[10px] tracking-[0.5em] uppercase text-[#d4af37]/40">
+            documented evidence
+          </p>
+          <h2
+            className="font-serif font-extralight tracking-tight text-[#f7e7ce]/90"
+            style={{ fontSize: "clamp(2.5rem, 8vw, 6rem)" }}
+          >
+            Why you&apos;re different.
+          </h2>
+          <div className="w-16 h-px bg-[#d4af37]/20 mx-auto" />
+        </FadeIn>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {content.reasons.map((r, i) => (
+            <FadeIn key={i} delay={i * 0.08}>
+              <motion.div
+                whileHover={{ y: -6, scale: 1.02 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="h-full rounded-2xl p-6 border border-white/[0.07] bg-white/[0.03] backdrop-blur-sm hover:border-[#d4af37]/20 hover:bg-white/[0.06] transition-colors duration-500"
+              >
+                <div className="text-3xl mb-4">{r.emoji}</div>
+                <h3 className="font-serif text-xl text-[#d4af37]/90 mb-2 font-light">
+                  {r.title}
+                </h3>
+                <p className="text-[#f7e7ce]/45 text-sm leading-relaxed font-light">
+                  {r.desc}
+                </p>
+              </motion.div>
+            </FadeIn>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Timeline ─────────────────────────────────────────────────────────────────
+function TimelineSection() {
+  return (
+    <section className="px-5 py-24 relative">
+      <div className="max-w-2xl mx-auto">
+        <FadeIn className="text-center mb-20 space-y-3">
+          <p className="text-[10px] tracking-[0.5em] uppercase text-[#d4af37]/40">
+            how we got here
+          </p>
+          <h2
+            className="font-serif font-extralight tracking-tight text-[#f7e7ce]/90"
+            style={{ fontSize: "clamp(2.5rem, 8vw, 6rem)" }}
+          >
+            The chapters.
+          </h2>
+          <div className="w-16 h-px bg-[#d4af37]/20 mx-auto" />
+        </FadeIn>
+
+        <div className="relative pl-8">
+          {/* Vertical line */}
+          <div className="absolute left-3 top-2 bottom-2 w-px bg-gradient-to-b from-transparent via-[#d4af37]/20 to-transparent" />
+
+          <div className="space-y-14">
+            {content.timeline.map((item, i) => (
+              <FadeIn key={i} delay={i * 0.1}>
+                <div className="relative">
+                  {/* Dot */}
+                  <div className="absolute -left-8 top-1.5 w-6 h-6 rounded-full border border-[#d4af37]/30 bg-[#0d120f] flex items-center justify-center">
+                    <motion.div
+                      animate={{ scale: [1, 1.4, 1] }}
+                      transition={{ duration: 2, delay: i * 0.5, repeat: Infinity }}
+                      className="w-2 h-2 rounded-full bg-[#d4af37]/60"
+                    />
+                  </div>
+                  <p className="text-[10px] tracking-[0.4em] uppercase text-[#d4af37]/40 mb-1">
+                    {item.chapter}
+                  </p>
+                  <h3 className="font-serif text-2xl md:text-3xl text-[#f7e7ce]/90 font-light mb-2">
+                    {item.title}
+                  </h3>
+                  <p className="text-[#f7e7ce]/45 text-sm leading-relaxed font-light">
+                    {item.desc}
+                  </p>
+                </div>
+              </FadeIn>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Confession build-up ──────────────────────────────────────────────────────
+function ConfessionSection() {
+  return (
+    <section className="min-h-screen flex flex-col items-center justify-center px-6 py-24 text-center relative">
+      {/* Warm glow rising */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 4 }}
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(136,19,55,0.12) 0%, transparent 70%)",
+        }}
+      />
+
+      <div className="space-y-10 max-w-2xl z-10">
+        <FadeIn>
+          <p className="text-[10px] tracking-[0.5em] uppercase text-[#d4af37]/40">
+            okay… I need to say something
+          </p>
+        </FadeIn>
+
+        {content.confession.map((line, i) => (
+          <FadeIn key={i} delay={i * 0.3} y={30}>
+            <p
+              className="font-serif italic font-light tracking-tight"
+              style={{
+                fontSize: `clamp(${1.5 + i * 0.4}rem, ${4 + i * 1.5}vw, ${3 + i * 1.5}rem)`,
+                color: `rgba(247,231,206,${0.6 + i * 0.2})`,
+              }}
+            >
+              {line}
+            </p>
+          </FadeIn>
+        ))}
+
+        <FadeIn delay={1.2}>
+          <motion.div
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 2.5, repeat: Infinity }}
+            className="mt-4"
+          >
+            <p className="text-[9px] tracking-[0.4em] uppercase text-[#f7e7ce]/20">
+              keep scrolling…
+            </p>
+            <motion.div
+              animate={{ y: [0, 8, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+              className="w-px h-10 bg-gradient-to-b from-[#d4af37]/20 to-transparent mx-auto mt-3"
+            />
+          </motion.div>
+        </FadeIn>
+      </div>
+    </section>
+  );
+}
+
+// ─── Proposal (THE PRANK) ──────────────────────────────────────────────────────
+function ProposalSection() {
+  const [stage, setStage] = useState<"buildup" | "proposal" | "gotcha" | "love">("buildup");
+  const [noPos, setNoPos] = useState({ top: 0, left: 0, ready: false });
+  const [showConfetti, setShowConfetti] = useState(false);
+  const noButtonRef = useRef<HTMLButtonElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const inView = useInView(sectionRef, { once: true, margin: "-100px" });
+
+  // Auto-advance buildup → proposal when section comes into view
+  useEffect(() => {
+    if (inView && stage === "buildup") {
+      const t = setTimeout(() => setStage("proposal"), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [inView, stage]);
+
+  // Pin initial NO button position once visible
+  useEffect(() => {
+    if (stage !== "proposal") return;
+    const t = setTimeout(() => {
+      if (noButtonRef.current) {
+        const rect = noButtonRef.current.getBoundingClientRect();
+        setNoPos({ top: rect.top, left: rect.left, ready: true });
+      }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [stage]);
+
+  const escapeNo = () => {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const bw = noButtonRef.current?.offsetWidth ?? 110;
+    const bh = noButtonRef.current?.offsetHeight ?? 48;
+    const pad = 20;
+    setNoPos({
+      top: Math.random() * (H - bh - pad * 2) + pad,
+      left: Math.random() * (W - bw - pad * 2) + pad,
+      ready: true,
+    });
+  };
+
+  const handleYes = () => {
+    setShowConfetti(true);
+    setTimeout(() => setStage("gotcha"), 900);
+  };
+
+  const roots = {
+    buildup: (
+      <motion.div
+        key="buildup"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="text-center space-y-4"
+      >
+        <motion.div
+          animate={{ scale: [1, 1.05, 1] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="text-5xl"
+        >
+          ❓
+        </motion.div>
+        <p className="text-[#f7e7ce]/30 text-sm tracking-[0.3em] uppercase">loading...</p>
+      </motion.div>
+    ),
+
+    proposal: (
+      <motion.div
+        key="proposal"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ duration: 0.8 }}
+        className="text-center space-y-12 max-w-lg z-10 w-full"
+      >
+        {/* Floating hearts */}
+        {["❤️", "💕", "💖", "💗", "💝", "🥰"].map((h, i) => (
+          <motion.span
+            key={i}
+            className="fixed pointer-events-none select-none text-2xl"
+            style={{
+              left: `${10 + i * 14}%`,
+              top: `${15 + Math.sin(i * 1.2) * 15}%`,
+              zIndex: 10,
+            }}
+            animate={{ y: [-15, 15, -15], opacity: [0.2, 0.7, 0.2], rotate: [-8, 8, -8] }}
+            transition={{ duration: 3 + i * 0.4, repeat: Infinity, delay: i * 0.25 }}
+          >
+            {h}
+          </motion.span>
+        ))}
+
+        {/* Badge */}
+        <div className="inline-block px-4 py-1.5 rounded-full border border-pink-500/20 bg-pink-500/5 text-[10px] tracking-[0.4em] uppercase text-pink-300/60">
+          The big question
+        </div>
+
+        {/* Question */}
+        <motion.h2
+          animate={{ scale: [1, 1.015, 1] }}
+          transition={{ duration: 3, repeat: Infinity }}
+          className="font-serif font-extralight tracking-tight text-pink-100 leading-tight whitespace-pre-line"
+          style={{ fontSize: "clamp(3rem, 10vw, 7rem)" }}
+        >
+          {content.prank.question}
+        </motion.h2>
+
+        {/* Buttons row */}
+        <div className="flex justify-center items-center gap-6">
+          {/* YES */}
+          <motion.button
+            whileHover={{ scale: 1.08, y: -4 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleYes}
+            className="relative px-10 py-5 rounded-full font-bold tracking-[0.3em] uppercase text-xs text-white overflow-hidden shadow-[0_20px_50px_-10px_rgba(236,72,153,0.5)]"
+            style={{
+              background: "linear-gradient(135deg, #ec4899, #f43f5e)",
+            }}
+          >
+            <motion.div
+              className="absolute inset-0"
+              animate={{ x: ["-100%", "200%"] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)",
+                transform: "skewX(-15deg)",
+              }}
+            />
+            <span className="relative z-10">{content.prank.yesLabel}</span>
+          </motion.button>
+
+          {/* Ghost placeholder — keeps YES centred */}
+          <div
+            className="px-8 py-4 opacity-0 pointer-events-none select-none text-xs"
+            aria-hidden
+          >
+            {content.prank.noLabel}
+          </div>
+        </div>
+
+        <p className="text-[#f7e7ce]/25 text-xs italic">
+          (try the other button… if you can 😈)
+        </p>
+      </motion.div>
+    ),
+
+    gotcha: (
+      <motion.div
+        key="gotcha"
+        initial={{ opacity: 0, scale: 0.7, y: 30 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: "spring", damping: 18, stiffness: 200 }}
+        className="text-center space-y-8 max-w-md z-10 px-4"
+      >
+        <motion.div
+          animate={{ rotate: [0, -8, 8, -8, 8, 0] }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="text-6xl"
+        >
+          🎉
+        </motion.div>
+        <h2
+          className="font-serif font-extralight tracking-tight text-[#d4af37] leading-none"
+          style={{ fontSize: "clamp(3rem, 10vw, 7rem)" }}
+        >
+          {content.prank.reveal}
+        </h2>
+        <div className="w-16 h-px bg-[#d4af37]/30 mx-auto" />
+        <p className="text-[#f7e7ce]/70 text-base md:text-lg font-light leading-relaxed">
+          {content.prank.subReveal}
+        </p>
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="text-[#f7e7ce]/45 text-sm font-light italic leading-relaxed max-w-xs mx-auto"
+        >
+          {content.prank.friendship}
+        </motion.p>
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.4 }}
+          onClick={() => setStage("love")}
+          className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37]/40 hover:text-[#d4af37] border border-[#d4af37]/20 hover:border-[#d4af37]/50 px-8 py-3 rounded-full transition-all duration-300"
+        >
+          okay fine 😌
+        </motion.button>
+      </motion.div>
+    ),
+
+    love: (
+      <motion.div
+        key="love"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1.5 }}
+        className="text-center space-y-8 max-w-md z-10 px-4"
+      >
+        <motion.div
+          animate={{ scale: [1, 1.15, 1] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="text-5xl"
+        >
+          🫶
+        </motion.div>
+        <h2
+          className="font-serif font-extralight tracking-tight text-[#f7e7ce] leading-tight"
+          style={{ fontSize: "clamp(2rem, 7vw, 5rem)" }}
+        >
+          But seriously though.
+        </h2>
+        <div className="w-16 h-px bg-[#d4af37]/20 mx-auto" />
+        <p className="text-[#f7e7ce]/60 font-light leading-relaxed text-sm md:text-base">
+          You&apos;re one of those rare people that make the world genuinely better just by being in it.
+          Don&apos;t you ever forget that.
+        </p>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          className="font-serif italic text-[#d4af37]/70 text-lg"
+        >
+          {content.prank.final}
+        </motion.p>
+      </motion.div>
+    ),
+  };
+
+  return (
+    <section
+      ref={sectionRef}
+      className="min-h-screen flex flex-col items-center justify-center relative px-6 py-24 text-center overflow-hidden"
+    >
+      {/* Romantic glow */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={stage === "proposal" ? { opacity: 1 } : { opacity: 0 }}
+        transition={{ duration: 2 }}
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(190,18,60,0.18) 0%, transparent 70%)",
+        }}
+      />
+
+      {/* Confetti */}
+      {showConfetti && <ConfettiBlast />}
+
+      {/* Runaway NO button — fixed, escapes viewport-safely */}
+      {stage === "proposal" && (
+        <motion.button
+          ref={noButtonRef}
+          animate={noPos.ready ? { top: noPos.top, left: noPos.left } : {}}
+          transition={{ type: "spring", stiffness: 500, damping: 28 }}
+          onMouseEnter={escapeNo}
+          onHoverStart={escapeNo}
+          onTouchStart={escapeNo}
+          onClick={escapeNo}
+          className="fixed z-[300] px-8 py-4 rounded-full font-bold tracking-[0.3em] uppercase text-[10px] text-[#f7e7ce]/50 border border-white/10 bg-white/5 backdrop-blur-sm"
+          style={
+            noPos.ready
+              ? { cursor: "not-allowed" }
+              : { opacity: 0, pointerEvents: "none" }
+          }
+          aria-label="No"
+        >
+          {content.prank.noLabel}
+        </motion.button>
       )}
-    </div>
+
+      <AnimatePresence mode="wait">
+        {roots[stage]}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+// ─── Footer ───────────────────────────────────────────────────────────────────
+function Footer() {
+  return (
+    <footer className="py-24 text-center">
+      <FadeIn>
+        <div className="space-y-4">
+          <div className="w-12 h-px bg-[#d4af37]/15 mx-auto" />
+          <p className="text-[9px] font-medium tracking-[2em] text-[#f7e7ce]/15 uppercase pl-[2em]">
+            made with ♥ just for you
+          </p>
+        </div>
+      </FadeIn>
+    </footer>
   );
 }
