@@ -493,14 +493,14 @@ function ConfessionSection() {
 
 // ─── Proposal (THE PRANK) ──────────────────────────────────────────────────────
 function ProposalSection() {
-  const [stage, setStage] = useState<"buildup" | "proposal" | "gotcha" | "love">("buildup");
+  const [stage, setStage] = useState<"buildup" | "proposal" | "error" | "gotcha" | "love">("buildup");
   const [noPos, setNoPos] = useState({ top: 0, left: 0, ready: false });
   const [showConfetti, setShowConfetti] = useState(false);
   const noButtonRef = useRef<HTMLButtonElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const inView = useInView(sectionRef, { once: true, margin: "-100px" });
 
-  // Auto-advance buildup → proposal when section comes into view
+  // Auto-advance buildup → proposal
   useEffect(() => {
     if (inView && stage === "buildup") {
       const t = setTimeout(() => setStage("proposal"), 1200);
@@ -508,7 +508,6 @@ function ProposalSection() {
     }
   }, [inView, stage]);
 
-  // Pin initial NO button position once visible
   useEffect(() => {
     if (stage !== "proposal") return;
     const t = setTimeout(() => {
@@ -534,8 +533,11 @@ function ProposalSection() {
   };
 
   const handleYes = () => {
-    setShowConfetti(true);
-    setTimeout(() => setStage("gotcha"), 900);
+    setStage("error");
+    setTimeout(() => {
+        setShowConfetti(true);
+        setStage("gotcha");
+    }, 3500);
   };
 
   const roots = {
@@ -548,13 +550,13 @@ function ProposalSection() {
         className="text-center space-y-4"
       >
         <motion.div
-          animate={{ scale: [1, 1.05, 1] }}
+          animate={{ scale: [1, 1.05, 1], rotate: [0, 10, -10, 0] }}
           transition={{ duration: 2, repeat: Infinity }}
-          className="text-5xl"
+          className="text-6xl"
         >
-          ❓
+          🎁
         </motion.div>
-        <p className="text-[#f7e7ce]/30 text-sm tracking-[0.3em] uppercase">loading...</p>
+        <p className="text-[#f7e7ce]/30 text-sm tracking-[0.3em] uppercase animate-pulse">Decrypting Surprise...</p>
       </motion.div>
     ),
 
@@ -563,50 +565,50 @@ function ProposalSection() {
         key="proposal"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9 }}
+        exit={{ opacity: 0, scale: 0.9, filter: "blur(10px)" }}
         transition={{ duration: 0.8 }}
         className="text-center space-y-12 max-w-lg z-10 w-full"
       >
-        {/* Floating hearts */}
         {["❤️", "💕", "💖", "💗", "💝", "🥰"].map((h, i) => (
           <motion.span
             key={i}
-            className="fixed pointer-events-none select-none text-2xl"
+            className="fixed pointer-events-none select-none text-3xl"
             style={{
               left: `${10 + i * 14}%`,
               top: `${15 + Math.sin(i * 1.2) * 15}%`,
               zIndex: 10,
             }}
-            animate={{ y: [-15, 15, -15], opacity: [0.2, 0.7, 0.2], rotate: [-8, 8, -8] }}
-            transition={{ duration: 3 + i * 0.4, repeat: Infinity, delay: i * 0.25 }}
+            animate={{ 
+                y: [-25, 25, -25], 
+                opacity: [0.1, 0.8, 0.1], 
+                rotate: [-15, 15, -15],
+                scale: [0.8, 1.1, 0.8] 
+            }}
+            transition={{ duration: 3 + i * 0.5, repeat: Infinity, delay: i * 0.2 }}
           >
             {h}
           </motion.span>
         ))}
 
-        {/* Badge */}
-        <div className="inline-block px-4 py-1.5 rounded-full border border-pink-500/20 bg-pink-500/5 text-[10px] tracking-[0.4em] uppercase text-pink-300/60">
-          The big question
+        <div className="inline-block px-4 py-1.5 rounded-full border border-pink-500/40 bg-pink-500/10 text-[10px] tracking-[0.6em] uppercase text-pink-300 font-bold animate-pulse">
+          FINAL DECISION REQUIRED
         </div>
 
-        {/* Question */}
         <motion.h2
-          animate={{ scale: [1, 1.015, 1] }}
-          transition={{ duration: 3, repeat: Infinity }}
-          className="font-serif font-extralight tracking-tight text-pink-100 leading-tight whitespace-pre-line"
-          style={{ fontSize: "clamp(3rem, 10vw, 7rem)" }}
+          animate={{ scale: [1, 1.03, 1] }}
+          transition={{ duration: 2.5, repeat: Infinity }}
+          className="font-serif font-extralight tracking-tight text-pink-50 text-shadow-glow"
+          style={{ fontSize: "clamp(3.5rem, 12vw, 8rem)", lineHeight: 0.9 }}
         >
           {content.prank.question}
         </motion.h2>
 
-        {/* Buttons row */}
         <div className="flex justify-center items-center gap-6">
-          {/* YES */}
           <motion.button
-            whileHover={{ scale: 1.08, y: -4 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.1, y: -6, boxShadow: "0 0 30px rgba(236,72,153,0.6)" }}
+            whileTap={{ scale: 0.9 }}
             onClick={handleYes}
-            className="relative px-10 py-5 rounded-full font-bold tracking-[0.3em] uppercase text-xs text-white overflow-hidden shadow-[0_20px_50px_-10px_rgba(236,72,153,0.5)]"
+            className="relative px-12 py-6 rounded-full font-bold tracking-[0.4em] uppercase text-sm text-white overflow-hidden shadow-2xl"
             style={{
               background: "linear-gradient(135deg, #ec4899, #f43f5e)",
             }}
@@ -614,17 +616,15 @@ function ProposalSection() {
             <motion.div
               className="absolute inset-0"
               animate={{ x: ["-100%", "200%"] }}
-              transition={{ duration: 2.5, repeat: Infinity, ease: "linear" }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
               style={{
-                background:
-                  "linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent)",
-                transform: "skewX(-15deg)",
+                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
+                transform: "skewX(-20deg)",
               }}
             />
             <span className="relative z-10">{content.prank.yesLabel}</span>
           </motion.button>
 
-          {/* Ghost placeholder — keeps YES centred */}
           <div
             className="px-8 py-4 opacity-0 pointer-events-none select-none text-xs"
             aria-hidden
@@ -632,43 +632,70 @@ function ProposalSection() {
             {content.prank.noLabel}
           </div>
         </div>
-
-        <p className="text-[#f7e7ce]/25 text-xs italic">
-          (try the other button… if you can 😈)
-        </p>
       </motion.div>
+    ),
+
+    error: (
+        <motion.div
+          key="error"
+          initial={{ opacity: 0, scale: 1.1 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
+          className="text-left font-mono z-[100] max-w-lg bg-red-950/90 border-2 border-red-500 p-8 rounded-lg shadow-[0_0_100px_rgba(239,68,68,0.5)]"
+        >
+            <div className="flex items-center gap-3 mb-4 text-red-500">
+                <div className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
+                <h3 className="text-xl font-bold tracking-widest">{content.prank.errorTitle}</h3>
+            </div>
+            <p className="text-red-200/80 text-sm leading-relaxed mb-6">
+                {content.prank.errorMsg}
+            </p>
+            <div className="space-y-2 text-[10px] text-red-500/50">
+                <p>{"> Initializing friendship_override.bat..."}</p>
+                <p>{"> Clearing user_denial_v2.dll..."}</p>
+                <p>{"> Succesfully injected \"Bestie Forever\" script."}</p>
+                <motion.p 
+                  animate={{ opacity: [0, 1] }}
+                  transition={{ repeat: Infinity, duration: 0.5 }}
+                  className="text-red-500 font-bold"
+                >{"> SYSTEM REBOOTING..."}</motion.p>
+            </div>
+        </motion.div>
     ),
 
     gotcha: (
       <motion.div
         key="gotcha"
-        initial={{ opacity: 0, scale: 0.7, y: 30 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: "spring", damping: 18, stiffness: 200 }}
+        initial={{ opacity: 0, scale: 1.5, rotate: -20 }}
+        animate={{ opacity: 1, scale: 1, rotate: 0 }}
+        transition={{ type: "spring", damping: 12, stiffness: 200 }}
         className="text-center space-y-8 max-w-md z-10 px-4"
       >
         <motion.div
-          animate={{ rotate: [0, -8, 8, -8, 8, 0] }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-6xl"
+          animate={{ 
+              scale: [1, 1.4, 1],
+              rotate: [0, -15, 15, -15, 15, 0]
+          }}
+          transition={{ duration: 0.5, repeat: 3 }}
+          className="text-8xl mb-4"
         >
-          🎉
+          🫠
         </motion.div>
         <h2
           className="font-serif font-extralight tracking-tight text-[#d4af37] leading-none"
-          style={{ fontSize: "clamp(3rem, 10vw, 7rem)" }}
+          style={{ fontSize: "clamp(3.5rem, 12vw, 8rem)" }}
         >
           {content.prank.reveal}
         </h2>
-        <div className="w-16 h-px bg-[#d4af37]/30 mx-auto" />
-        <p className="text-[#f7e7ce]/70 text-base md:text-lg font-light leading-relaxed">
+        <div className="w-24 h-px bg-[#d4af37]/40 mx-auto" />
+        <p className="text-[#f7e7ce] text-xl md:text-2xl font-light leading-relaxed">
           {content.prank.subReveal}
         </p>
         <motion.p
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
-          className="text-[#f7e7ce]/45 text-sm font-light italic leading-relaxed max-w-xs mx-auto"
+          className="text-[#f7e7ce]/60 text-lg font-light leading-relaxed max-w-sm mx-auto"
         >
           {content.prank.friendship}
         </motion.p>
@@ -677,9 +704,9 @@ function ProposalSection() {
           animate={{ opacity: 1 }}
           transition={{ delay: 1.4 }}
           onClick={() => setStage("love")}
-          className="text-[10px] uppercase tracking-[0.4em] text-[#d4af37]/40 hover:text-[#d4af37] border border-[#d4af37]/20 hover:border-[#d4af37]/50 px-8 py-3 rounded-full transition-all duration-300"
+          className="text-[12px] uppercase tracking-[0.6em] text-[#d4af37] font-bold border-2 border-[#d4af37]/30 hover:border-[#d4af37] px-12 py-4 rounded-full transition-all duration-300 bg-[#d4af37]/5"
         >
-          okay fine 😌
+          i fell for it 🤡
         </motion.button>
       </motion.div>
     ),
@@ -693,28 +720,27 @@ function ProposalSection() {
         className="text-center space-y-8 max-w-md z-10 px-4"
       >
         <motion.div
-          animate={{ scale: [1, 1.15, 1] }}
+          animate={{ scale: [1, 1.3, 1] }}
           transition={{ duration: 2, repeat: Infinity }}
-          className="text-5xl"
+          className="text-6xl"
         >
-          🫶
+          ✨🫶✨
         </motion.div>
         <h2
-          className="font-serif font-extralight tracking-tight text-[#f7e7ce] leading-tight"
-          style={{ fontSize: "clamp(2rem, 7vw, 5rem)" }}
+          className="font-serif font-extralight tracking-tight text-[#f7e7ce]"
+          style={{ fontSize: "clamp(2.5rem, 8vw, 6rem)" }}
         >
-          But seriously though.
+          The Real Talk.
         </h2>
         <div className="w-16 h-px bg-[#d4af37]/20 mx-auto" />
-        <p className="text-[#f7e7ce]/60 font-light leading-relaxed text-sm md:text-base">
-          You&apos;re one of those rare people that make the world genuinely better just by being in it.
-          Don&apos;t you ever forget that.
+        <p className="text-[#f7e7ce]/70 font-light leading-relaxed text-lg italic">
+          "People like you are the reason some of us still believe in genuine connections."
         </p>
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1 }}
-          className="font-serif italic text-[#d4af37]/70 text-lg"
+          className="font-serif italic text-[#d4af37] text-2xl font-light"
         >
           {content.prank.final}
         </motion.p>

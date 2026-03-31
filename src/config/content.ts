@@ -25,11 +25,13 @@ export const content = {
   ],
   prank: {
     question: "Will you\nbe my...",
-    yesLabel: "Yes 💖",
-    noLabel: "No 🙅",
+    yesLabel: "YES! (Obviously) 💍",
+    noLabel: "No. (I'm Boring) 🥱",
+    errorTitle: "SYSTEM ERROR 404",
+    errorMsg: "The 'No' option was found to be statistically impossible. Reality.exe has encountered a critical failure. Attempting to repair with a forced 'Yes' protocol...",
     reveal: "APRIL FOOL! 🎉",
-    subReveal: "Did your heart skip? 😂 I felt that from here. Relax — you're NOT getting rid of me that easily.",
-    friendship: "But genuinely though? You're one of the best people I know. Don't ever change.",
-    final: "Always in your corner. No questions asked. 💛",
+    subReveal: "Did your soul actually leave your body? 😂 I could feel the panic from here. Relax—you're NOT getting rid of me that easily.",
+    friendship: "But for real though? You're the top 1% of human beings. Don't ever change.",
+    final: "I've always got your back. No questions (or pranks) asked. 💛",
   },
 };
