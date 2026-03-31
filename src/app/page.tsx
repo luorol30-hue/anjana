@@ -101,6 +101,7 @@ function ConfettiBlast() {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function Home() {
+  const [hasUnlocked, setHasUnlocked] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [needsUnmute, setNeedsUnmute] = useState(false);
@@ -109,15 +110,29 @@ export default function Home() {
   const prankAudioRef = useRef<HTMLAudioElement | null>(null);
   const { scrollYProgress } = useScroll();
 
-  useEffect(() => setIsMounted(true), []);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const startExperience = () => {
+    setHasUnlocked(true);
+    if (audioRef.current) {
+        audioRef.current.muted = false;
+        audioRef.current.volume = 0.35;
+        audioRef.current.play().then(() => {
+            setIsPlaying(true);
+            setIsMuted(false);
+        }).catch(err => console.error("Audio play failed:", err));
+    }
+  };
 
   useEffect(() => {
     if (!isMounted) return;
-    
-    // Main Romantic Music
+
+    // Main Romantic Music (Requested Pixabay URL)
     let audio: HTMLAudioElement;
     try {
-      audio = new Audio("/audio/track.mp3");
+      audio = new Audio("https://cdn.pixabay.com/audio/2025/07/17/audio_ba311fbaa0.mp3");
     } catch {
       return;
     }
@@ -125,7 +140,7 @@ export default function Home() {
     audio.volume = 0.35;
     audioRef.current = audio;
 
-    // Prank Comedy Music (New)
+    // Prank Comedy Music
     let prankAudio: HTMLAudioElement;
     try {
       prankAudio = new Audio("https://cdn.pixabay.com/audio/2024/09/26/audio_249ea3656c.mp3");
@@ -135,48 +150,11 @@ export default function Home() {
     prankAudio.volume = 0.5;
     prankAudioRef.current = prankAudio;
 
-    const unmute = () => {
-      if (!audioRef.current) return;
-      audioRef.current.muted = false;
-      audioRef.current.volume = 0.35;
-      setIsMuted(false);
-      setNeedsUnmute(false);
-    };
-
-    audio
-      .play()
-      .then(() => {
-        setIsPlaying(true);
-        setNeedsUnmute(false);
-      })
-      .catch(() => {
-        audio.muted = true;
-        audio.volume = 0;
-        audio
-          .play()
-          .then(() => {
-            setIsPlaying(true);
-            setNeedsUnmute(true);
-            ["click", "touchstart", "scroll", "keydown", "pointerdown"].forEach((e) =>
-              window.addEventListener(e, unmute, { passive: true, once: true })
-            );
-          })
-          .catch(() => {
-            const start = () => {
-              audioRef.current?.play().then(() => {
-                setIsPlaying(true);
-                setIsMuted(false);
-              });
-            };
-            ["click", "touchstart", "scroll", "keydown", "pointerdown"].forEach((e) =>
-              window.addEventListener(e, start, { passive: true, once: true })
-            );
-          });
-      });
-
     return () => {
       audioRef.current?.pause();
       audioRef.current = null;
+      prankAudioRef.current?.pause();
+      prankAudioRef.current = null;
     };
   }, [isMounted]);
 
@@ -195,6 +173,34 @@ export default function Home() {
 
   return (
     <main className="relative bg-[#0d120f] text-[#f7e7ce] overflow-x-hidden selection:bg-[#d4af37] selection:text-[#0d120f]">
+      <AnimatePresence>
+        {!hasUnlocked && (
+           <motion.div
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0 }}
+             className="fixed inset-0 z-[1000] flex items-center justify-center bg-[#0d120f] bg-opacity-95 backdrop-blur-xl"
+           >
+             <motion.button
+               whileHover={{ scale: 1.05 }}
+               whileTap={{ scale: 0.95 }}
+               onClick={startExperience}
+               className="group relative px-12 py-6 rounded-full border border-[#d4af37]/30 bg-white/5 text-[#f7e7ce] transition-all duration-500 overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.15)] hover:shadow-[0_0_80px_rgba(212,175,55,0.25)] hover:border-[#d4af37]/60"
+             >
+               <motion.div 
+                 className="absolute inset-0 bg-gradient-to-r from-transparent via-[#d4af37]/10 to-transparent"
+                 animate={{ x: ['-100%', '200%'] }}
+                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+               />
+               <div className="relative z-10 flex flex-col items-center gap-3">
+                 <p className="text-[10px] tracking-[0.6em] uppercase text-[#d4af37]/60">a surprise from local</p>
+                 <span className="text-xl font-serif tracking-widest uppercase">Unlock Experience</span>
+               </div>
+             </motion.button>
+           </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Scroll bar */}
       <motion.div
         className="fixed top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#d4af37] via-[#f7e7ce] to-[#d4af37] origin-left z-[100]"
@@ -548,29 +554,29 @@ function ProposalSection() {
   const handleYes = () => {
     // Fade out romantic music
     if (audioRef.current) {
-        const currentVol = audioRef.current.volume;
-        const fadeOut = setInterval(() => {
-            if (audioRef.current && audioRef.current.volume > 0.02) {
-                audioRef.current.volume -= 0.02;
-            } else {
-                if (audioRef.current) {
-                    audioRef.current.pause();
-                }
-                clearInterval(fadeOut);
-            }
-        }, 50);
+      const currentVol = audioRef.current.volume;
+      const fadeOut = setInterval(() => {
+        if (audioRef.current && audioRef.current.volume > 0.02) {
+          audioRef.current.volume -= 0.02;
+        } else {
+          if (audioRef.current) {
+            audioRef.current.pause();
+          }
+          clearInterval(fadeOut);
+        }
+      }, 50);
     }
 
     // Play prank music
     if (prankAudioRef.current) {
-        prankAudioRef.current.currentTime = 0;
-        prankAudioRef.current.play().catch(() => {});
+      prankAudioRef.current.currentTime = 0;
+      prankAudioRef.current.play().catch(() => { });
     }
 
     setStage("error");
     setTimeout(() => {
-        setShowConfetti(true);
-        setStage("gotcha");
+      setShowConfetti(true);
+      setStage("gotcha");
     }, 3500);
   };
 
@@ -612,11 +618,11 @@ function ProposalSection() {
               top: `${15 + Math.sin(i * 1.2) * 15}%`,
               zIndex: 10,
             }}
-            animate={{ 
-                y: [-25, 25, -25], 
-                opacity: [0.1, 0.8, 0.1], 
-                rotate: [-15, 15, -15],
-                scale: [0.8, 1.1, 0.8] 
+            animate={{
+              y: [-25, 25, -25],
+              opacity: [0.1, 0.8, 0.1],
+              rotate: [-15, 15, -15],
+              scale: [0.8, 1.1, 0.8]
             }}
             transition={{ duration: 3 + i * 0.5, repeat: Infinity, delay: i * 0.2 }}
           >
@@ -670,31 +676,31 @@ function ProposalSection() {
     ),
 
     error: (
-        <motion.div
-          key="error"
-          initial={{ opacity: 0, scale: 1.1 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0 }}
-          className="text-left font-mono z-[100] max-w-lg bg-red-950/90 border-2 border-red-500 p-8 rounded-lg shadow-[0_0_100px_rgba(239,68,68,0.5)]"
-        >
-            <div className="flex items-center gap-3 mb-4 text-red-500">
-                <div className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
-                <h3 className="text-xl font-bold tracking-widest">{content.prank.errorTitle}</h3>
-            </div>
-            <p className="text-red-200/80 text-sm leading-relaxed mb-6">
-                {content.prank.errorMsg}
-            </p>
-            <div className="space-y-2 text-[10px] text-red-500/50">
-                <p>{"> Initializing friendship_override.bat..."}</p>
-                <p>{"> Clearing user_denial_v2.dll..."}</p>
-                <p>{"> Succesfully injected \"Bestie Forever\" script."}</p>
-                <motion.p 
-                  animate={{ opacity: [0, 1] }}
-                  transition={{ repeat: Infinity, duration: 0.5 }}
-                  className="text-red-500 font-bold"
-                >{"> SYSTEM REBOOTING..."}</motion.p>
-            </div>
-        </motion.div>
+      <motion.div
+        key="error"
+        initial={{ opacity: 0, scale: 1.1 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0 }}
+        className="text-left font-mono z-[100] max-w-lg bg-red-950/90 border-2 border-red-500 p-8 rounded-lg shadow-[0_0_100px_rgba(239,68,68,0.5)]"
+      >
+        <div className="flex items-center gap-3 mb-4 text-red-500">
+          <div className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
+          <h3 className="text-xl font-bold tracking-widest">{content.prank.errorTitle}</h3>
+        </div>
+        <p className="text-red-200/80 text-sm leading-relaxed mb-6">
+          {content.prank.errorMsg}
+        </p>
+        <div className="space-y-2 text-[10px] text-red-500/50">
+          <p>{"> Initializing friendship_override.bat..."}</p>
+          <p>{"> Clearing user_denial_v2.dll..."}</p>
+          <p>{"> Succesfully injected \"Bestie Forever\" script."}</p>
+          <motion.p
+            animate={{ opacity: [0, 1] }}
+            transition={{ repeat: Infinity, duration: 0.5 }}
+            className="text-red-500 font-bold"
+          >{"> SYSTEM REBOOTING..."}</motion.p>
+        </div>
+      </motion.div>
     ),
 
     gotcha: (
@@ -706,9 +712,9 @@ function ProposalSection() {
         className="text-center space-y-8 max-w-md z-10 px-4"
       >
         <motion.div
-          animate={{ 
-              scale: [1, 1.4, 1],
-              rotate: [0, -15, 15, -15, 15, 0]
+          animate={{
+            scale: [1, 1.4, 1],
+            rotate: [0, -15, 15, -15, 15, 0]
           }}
           transition={{ duration: 0.5, repeat: 3 }}
           className="text-8xl mb-4"
