@@ -265,7 +265,10 @@ export default function Home() {
       <ReasonsSection />
       <TimelineSection />
       <ConfessionSection />
-      <ProposalSection />
+      <ProposalSection 
+        audioRef={audioRef}
+        prankAudioRef={prankAudioRef}
+      />
       <Footer />
     </main>
   );
@@ -511,7 +514,13 @@ function ConfessionSection() {
 }
 
 // ─── Proposal (THE PRANK) ──────────────────────────────────────────────────────
-function ProposalSection() {
+function ProposalSection({ 
+    audioRef, 
+    prankAudioRef 
+}: { 
+    audioRef: React.RefObject<HTMLAudioElement | null>, 
+    prankAudioRef: React.RefObject<HTMLAudioElement | null> 
+}) {
   const [stage, setStage] = useState<"buildup" | "proposal" | "error" | "gotcha" | "love">("buildup");
   const [noPos, setNoPos] = useState({ top: 0, left: 0, ready: false });
   const [showConfetti, setShowConfetti] = useState(false);
